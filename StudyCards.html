@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudyCards — Aprende con IA</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: #2a2a35;
+    --accent: #7c6aff;
+    --accent2: #ff6a6a;
+    --accent3: #6affd4;
+    --text: #f0f0f5;
+    --text-dim: #7a7a90;
+    --correct: #4ade80;
+    --wrong: #f87171;
+    --radius: 14px;
+    --mono: 'DM Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --display: 'Syne', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,255,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,255,.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Layout ── */
+  #app { position: relative; z-index: 1; }
+
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    background: rgba(13,13,15,.8);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: var(--display);
+    font-size: 1.3rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent); }
+  .header-nav { display: flex; gap: 10px; }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family: var(--sans);
+    font-size: .85rem;
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all .2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #6b58f0; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,106,255,.35); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent); background: rgba(124,106,255,.08); }
+  .btn-danger { background: rgba(248,113,113,.15); color: var(--wrong); border: 1px solid rgba(248,113,113,.3); }
+  .btn-danger:hover { background: rgba(248,113,113,.25); }
+  .btn-success { background: rgba(74,222,128,.15); color: var(--correct); border: 1px solid rgba(74,222,128,.3); }
+  .btn-sm { padding: 7px 14px; font-size: .8rem; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; transform: none !important; }
+
+  /* ── Cards (UI) ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    transition: border-color .2s, transform .2s;
+  }
+  .card:hover { border-color: rgba(124,106,255,.4); }
+
+  /* ── Home Screen ── */
+  #screen-home {
+    padding: 48px 32px;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .hero {
+    text-align: center;
+    margin-bottom: 52px;
+    animation: fadeUp .5s ease both;
+  }
+  .hero h1 {
+    font-family: var(--display);
+    font-size: clamp(2.2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 14px;
+    letter-spacing: -1px;
+  }
+  .hero h1 .hi { color: var(--accent); }
+  .hero p { color: var(--text-dim); font-size: 1.05rem; max-width: 500px; margin: 0 auto 28px; }
+  .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+  .decks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    animation: fadeUp .5s .1s ease both;
+  }
+  .section-title {
+    font-family: var(--display);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+  }
+
+  .deck-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .deck-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .deck-card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 12px 40px rgba(124,106,255,.15); }
+  .deck-card:hover::before { opacity: 1; }
+  .deck-name { font-family: var(--display); font-weight: 700; font-size: 1.05rem; margin-bottom: 8px; }
+  .deck-meta { font-size: .8rem; color: var(--text-dim); display: flex; gap: 12px; flex-wrap: wrap; }
+  .deck-actions { display: flex; gap: 8px; margin-top: 16px; }
+
+  .progress-bar-wrap { background: var(--surface2); border-radius: 99px; height: 5px; margin-top: 12px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent3)); transition: width .4s; }
+
+  .empty-state {
+    grid-column: 1/-1;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dim);
+  }
+  .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+  .empty-state p { font-size: .95rem; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.7);
+    backdrop-filter: blur(6px);
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 32px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: fadeUp .25s ease;
+  }
+  .modal h2 { font-family: var(--display); font-weight: 800; font-size: 1.4rem; margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+  /* ── Form Elements ── */
+  label { display: block; font-size: .82rem; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
+  input[type=text], textarea, select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 11px 14px;
+    font-family: var(--sans);
+    font-size: .9rem;
+    outline: none;
+    transition: border-color .2s;
+    resize: vertical;
+  }
+  input[type=text]:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  .form-group { margin-bottom: 18px; }
+  .hint { font-size: .78rem; color: var(--text-dim); margin-top: 5px; }
+  .tabs { display: flex; gap: 0; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .tab-btn { flex: 1; padding: 10px; font-family: var(--sans); font-size: .85rem; cursor: pointer; border: none; background: transparent; color: var(--text-dim); transition: all .2s; }
+  .tab-btn.active { background: var(--accent); color: #fff; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Study Screen ── */
+  #screen-study {
+    padding: 32px;
+    max-width: 720px;
+    margin: 0 auto;
+    width: 100%;
+    flex: 1;
+  }
+  .study-header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
+  .study-title { font-family: var(--display); font-weight: 700; font-size: 1.1rem; }
+  .study-counter { margin-left: auto; font-family: var(--mono); font-size: .85rem; color: var(--text-dim); }
+  .progress-track { height: 4px; background: var(--surface2); border-radius: 99px; margin-bottom: 40px; overflow: hidden; }
+  .progress-track-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent3)); transition: width .3s; }
+
+  .flashcard {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 36px;
+    margin-bottom: 28px;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    animation: fadeUp .3s ease;
+  }
+  .card-label {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--accent);
+    font-family: var(--mono);
+    margin-bottom: 16px;
+  }
+  .card-question {
+    font-family: var(--display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px; }
+  .option-btn {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 16px 18px;
+    font-family: var(--sans);
+    font-size: .9rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all .2s;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    animation: fadeUp .3s ease both;
+  }
+  .option-btn:nth-child(1) { animation-delay: .05s; }
+  .option-btn:nth-child(2) { animation-delay: .1s; }
+  .option-btn:nth-child(3) { animation-delay: .15s; }
+  .option-btn:nth-child(4) { animation-delay: .2s; }
+  .option-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(124,106,255,.1); transform: translateY(-2px); }
+  .option-btn.correct { border-color: var(--correct); background: rgba(74,222,128,.12); color: var(--correct); }
+  .option-btn.wrong { border-color: var(--wrong); background: rgba(248,113,113,.12); color: var(--wrong); }
+  .option-btn:disabled { cursor: default; }
+  .option-letter {
+    font-family: var(--mono);
+    font-size: .75rem;
+    background: var(--surface2);
+    border-radius: 5px;
+    padding: 2px 7px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .correct .option-letter { background: rgba(74,222,128,.2); }
+  .wrong .option-letter { background: rgba(248,113,113,.2); }
+
+  .feedback-box {
+    background: var(--surface2);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    font-size: .9rem;
+    line-height: 1.6;
+    border-left: 3px solid var(--accent);
+    display: none;
+    animation: fadeUp .2s ease;
+  }
+  .feedback-box.show { display: block; }
+  .study-nav { display: flex; gap: 12px; justify-content: flex-end; }
+
+  /* ── Results Screen ── */
+  #screen-results {
+    padding: 48px 32px;
+    max-width: 600px;
+    margin: 0 auto;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+  }
+  .results-score {
+    font-family: var(--display);
+    font-size: 6rem;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .results-label { font-size: 1.1rem; color: var(--text-dim); margin-bottom: 40px; }
+  .results-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; width: 100%; margin-bottom: 36px; }
+  .result-stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .result-stat-val { font-family: var(--display); font-size: 1.8rem; font-weight: 800; }
+  .result-stat-label { font-size: .78rem; color: var(--text-dim); margin-top: 4px; }
+  .results-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+  /* ── Loading ── */
+  .loading-box {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    color: var(--accent);
+    font-size: .9rem;
+    padding: 14px 20px;
+    background: rgba(124,106,255,.08);
+    border: 1px solid rgba(124,106,255,.2);
+    border-radius: 10px;
+    margin-top: 12px;
+  }
+  .loading-box.show { display: flex; }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(124,106,255,.3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 28px; right: 28px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-size: .88rem;
+    z-index: 999;
+    transform: translateY(20px);
+    opacity: 0;
+    transition: all .3s;
+    max-width: 320px;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { border-color: var(--correct); color: var(--correct); }
+  #toast.error { border-color: var(--wrong); color: var(--wrong); }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+  @media (max-width: 600px) {
+    .options-grid { grid-template-columns: 1fr; }
+    #screen-home, #screen-study, #screen-results { padding: 24px 16px; }
+    .results-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ HOME ══ -->
+  <div id="screen-home" class="screen active">
+    <header>
+      <div class="logo">Study<span>Cards</span></div>
+      <div class="header-nav">
+        <button class="btn btn-primary" onclick="openCreateDeck()">+ Nuevo Mazo</button>
+      </div>
+    </header>
+    <div style="padding:48px 32px; max-width:900px; margin:0 auto; width:100%;">
+      <div class="hero">
+        <h1>Aprende más rápido<br>con <span class="hi">IA</span> a tu lado</h1>
+        <p>Crea mazos de tarjetas desde tus apuntes, PDFs o deja que la IA genere el contenido por tema.</p>
+        <div class="hero-actions">
+          <button class="btn btn-primary" onclick="openCreateDeck()">🚀 Crear mi primer mazo</button>
+        </div>
+      </div>
+      <p class="section-title">Mis Mazos</p>
+      <div class="decks-grid" id="decks-grid"></div>
+    </div>
+  </div>
+
+  <!-- ══ STUDY ══ -->
+  <div id="screen-study" class="screen">
+    <header>
+      <div class="logo">Study<span>Cards</span></div>
+      <button class="btn btn-ghost btn-sm" onclick="goHome()">← Volver</button>
+    </header>
+    <div id="screen-study" style="padding:32px; max-width:720px; margin:0 auto; width:100%; flex:1;">
+      <div class="study-header">
+        <div>
+          <div class="section-title" id="study-deck-name"></div>
+          <div class="study-title" id="study-subtitle"></div>
+        </div>
+        <div class="study-counter" id="study-counter"></div>
+      </div>
+      <div class="progress-track"><div class="progress-track-fill" id="study-progress"></div></div>
+      <div class="flashcard" id="flashcard">
+        <div class="card-label">Pregunta</div>
+        <div class="card-question" id="card-question"></div>
+      </div>
+      <div class="options-grid" id="options-grid"></div>
+      <div class="feedback-box" id="feedback-box"></div>
+      <div class="study-nav">
+        <button class="btn btn-ghost" id="btn-next" onclick="nextCard()" style="display:none">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RESULTS ══ -->
+  <div id="screen-results" class="screen">
+    <header>
+      <div class="logo">Study<span>Cards</span></div>
+      <button class="btn btn-ghost btn-sm" onclick="goHome()">← Volver al inicio</button>
+    </header>
+    <div style="padding:48px 32px; max-width:600px; margin:0 auto; width:100%; display:flex; flex-direction:column; align-items:center; text-align:center; flex:1;">
+      <div class="results-score" id="results-score"></div>
+      <div class="results-label" id="results-label"></div>
+      <div class="results-grid" id="results-grid"></div>
+      <div class="results-actions">
+        <button class="btn btn-primary" onclick="restartStudy()">🔁 Repetir mazo</button>
+        <button class="btn btn-ghost" onclick="goHome()">🏠 Inicio</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ MODAL: Crear Mazo ══ -->
+<div class="modal-overlay" id="modal-create">
+  <div class="modal">
+    <h2>✨ Nuevo Mazo</h2>
+    <div class="form-group">
+      <label>Nombre del mazo</label>
+      <input type="text" id="deck-name-input" placeholder="Ej: Fundamentos de Python">
+    </div>
+    <div class="form-group">
+      <label>¿Cómo quieres agregar las tarjetas?</label>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('ai-topic')">🤖 Tema con IA</button>
+        <button class="tab-btn" onclick="switchTab('ai-text')">📝 Pegar texto</button>
+        <button class="tab-btn" onclick="switchTab('manual')">✍️ Manual</button>
+      </div>
+
+      <!-- Tab: IA por tema -->
+      <div class="tab-panel active" id="tab-ai-topic">
+        <div class="form-group">
+          <label>Tema a estudiar</label>
+          <input type="text" id="topic-input" placeholder="Ej: Variables y tipos de datos en Python">
+        </div>
+        <div class="form-group">
+          <label>Número de tarjetas</label>
+          <select id="num-cards-topic">
+            <option value="5">5 tarjetas</option>
+            <option value="8" selected>8 tarjetas</option>
+            <option value="12">12 tarjetas</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Idioma</label>
+          <select id="lang-topic">
+            <option value="español">Español</option>
+            <option value="inglés">Inglés</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Tab: Pegar texto -->
+      <div class="tab-panel" id="tab-ai-text">
+        <div class="form-group">
+          <label>Pega tus apuntes, diapositivas o resumen</label>
+          <textarea id="text-input" rows="7" placeholder="Pega aquí el texto de tus notas o el contenido de tu PDF..."></textarea>
+          <p class="hint">💡 La IA generará tarjetas basándose en tu material exacto.</p>
+        </div>
+        <div class="form-group">
+          <label>Número de tarjetas a generar</label>
+          <select id="num-cards-text">
+            <option value="5">5 tarjetas</option>
+            <option value="8" selected>8 tarjetas</option>
+            <option value="12">12 tarjetas</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Tab: Manual -->
+      <div class="tab-panel" id="tab-manual">
+        <p style="color:var(--text-dim); font-size:.88rem; margin-bottom:16px;">Agrega tarjetas una por una después de crear el mazo.</p>
+        <div class="form-group">
+          <label>Descripción (opcional)</label>
+          <input type="text" id="manual-desc" placeholder="Ej: Para el examen del jueves">
+        </div>
+      </div>
+    </div>
+
+    <div class="loading-box" id="loading-create">
+      <div class="spinner"></div>
+      <span id="loading-text">Generando tarjetas con IA...</span>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-create')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-create-deck" onclick="createDeck()">Crear Mazo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Agregar Tarjeta ══ -->
+<div class="modal-overlay" id="modal-add-card">
+  <div class="modal">
+    <h2>🃏 Nueva Tarjeta</h2>
+    <div class="form-group">
+      <label>Pregunta</label>
+      <textarea id="card-q" rows="3" placeholder="¿Qué es una variable?"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Respuesta correcta</label>
+      <input type="text" id="card-a" placeholder="Un espacio en memoria para guardar datos">
+    </div>
+    <div class="form-group">
+      <label>Opción incorrecta 2</label>
+      <input type="text" id="card-w1" placeholder="Distractor 1">
+    </div>
+    <div class="form-group">
+      <label>Opción incorrecta 3</label>
+      <input type="text" id="card-w2" placeholder="Distractor 2">
+    </div>
+    <div class="form-group">
+      <label>Opción incorrecta 4</label>
+      <input type="text" id="card-w3" placeholder="Distractor 3">
+    </div>
+    <div class="form-group">
+      <label>Explicación (aparece después de responder)</label>
+      <textarea id="card-exp" rows="2" placeholder="Explicación adicional o contexto..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-card')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCard()">Guardar Tarjeta</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Ver Mazo ══ -->
+<div class="modal-overlay" id="modal-deck-detail">
+  <div class="modal">
+    <h2 id="detail-title"></h2>
+    <div id="detail-stats" style="display:flex; gap:16px; margin-bottom:20px; flex-wrap:wrap;"></div>
+    <div id="detail-cards" style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; margin-bottom:16px;"></div>
+    <div class="modal-actions" style="justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="openAddCard()">+ Tarjeta</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteDeck()">🗑 Eliminar</button>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-deck-detail')">Cerrar</button>
+        <button class="btn btn-primary" onclick="startStudy()">▶ Estudiar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let decks = JSON.parse(localStorage.getItem('sc_decks') || '[]');
+let currentDeckId = null;
+let currentTab = 'ai-topic';
+let studyCards = [];
+let studyIndex = 0;
+let studyCorrect = 0;
+let studyWrong = 0;
+let answered = false;
+
+// ══════════════════════════════════════════════
+//  PERSISTENCE
+// ══════════════════════════════════════════════
+function save() {
+  localStorage.setItem('sc_decks', JSON.stringify(decks));
+}
+
+function getDeck(id) {
+  return decks.find(d => d.id === id);
+}
+
+// ══════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goHome() {
+  showScreen('screen-home');
+  renderDecks();
+}
+
+// ══════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  setTimeout(() => t.className = '', 3000);
+}
+
+// ══════════════════════════════════════════════
+//  MODAL
+// ══════════════════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ══════════════════════════════════════════════
+//  TABS (en modal crear)
+// ══════════════════════════════════════════════
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    const tabs = ['ai-topic','ai-text','manual'];
+    b.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// ══════════════════════════════════════════════
+//  RENDER DECKS
+// ══════════════════════════════════════════════
+function renderDecks() {
+  const grid = document.getElementById('decks-grid');
+  if (decks.length === 0) {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">📚</div><p>Aún no tienes mazos.<br>¡Crea tu primero!</p></div>`;
+    return;
+  }
+  grid.innerHTML = decks.map(d => {
+    const total = d.cards.length;
+    const studied = d.stats ? d.stats.studied : 0;
+    const pct = total > 0 ? Math.round((studied / total) * 100) : 0;
+    return `
+    <div class="deck-card" onclick="openDeckDetail('${d.id}')">
+      <div class="deck-name">${d.name}</div>
+      <div class="deck-meta">
+        <span>🃏 ${total} tarjetas</span>
+        <span>✅ ${studied} estudiadas</span>
+      </div>
+      <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+      <div style="font-size:.75rem; color:var(--text-dim); margin-top:8px;">${pct}% completado</div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+//  CREATE DECK
+// ══════════════════════════════════════════════
+function openCreateDeck() {
+  document.getElementById('deck-name-input').value = '';
+  document.getElementById('topic-input').value = '';
+  document.getElementById('text-input').value = '';
+  document.getElementById('loading-create').classList.remove('show');
+  switchTab('ai-topic');
+  openModal('modal-create');
+}
+
+async function createDeck() {
+  const name = document.getElementById('deck-name-input').value.trim();
+  if (!name) { toast('Escribe un nombre para el mazo', 'error'); return; }
+
+  let cards = [];
+
+  if (currentTab === 'ai-topic') {
+    const topic = document.getElementById('topic-input').value.trim();
+    if (!topic) { toast('Escribe un tema', 'error'); return; }
+    const n = document.getElementById('num-cards-topic').value;
+    const lang = document.getElementById('lang-topic').value;
+    cards = await generateCardsFromTopic(topic, n, lang);
+  } else if (currentTab === 'ai-text') {
+    const text = document.getElementById('text-input').value.trim();
+    if (!text) { toast('Pega tu texto de estudio', 'error'); return; }
+    const n = document.getElementById('num-cards-text').value;
+    cards = await generateCardsFromText(text, n);
+  }
+
+  if (cards === null) return; // error ya mostrado
+
+  const deck = {
+    id: Date.now().toString(),
+    name,
+    cards,
+    createdAt: new Date().toISOString(),
+    stats: { studied: 0, correct: 0, wrong: 0, sessions: 0 }
+  };
+
+  decks.unshift(deck);
+  save();
+  closeModal('modal-create');
+  renderDecks();
+  toast('✅ Mazo creado con ' + cards.length + ' tarjetas', 'success');
+}
+
+// ══════════════════════════════════════════════
+//  AI GENERATION
+// ══════════════════════════════════════════════
+function setLoading(on, msg = 'Generando tarjetas con IA...') {
+  const box = document.getElementById('loading-create');
+  const btn = document.getElementById('btn-create-deck');
+  document.getElementById('loading-text').textContent = msg;
+  box.classList.toggle('show', on);
+  btn.disabled = on;
+}
+
+async function callClaude(prompt) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  const data = await res.json();
+  return data.content.map(b => b.text || '').join('');
+}
+
+function parseCards(raw) {
+  // Remove json fences
+  const clean = raw.replace(/```json|```/g, '').trim();
+  const parsed = JSON.parse(clean);
+  return Array.isArray(parsed) ? parsed : parsed.cards || [];
+}
+
+async function generateCardsFromTopic(topic, n, lang) {
+  setLoading(true, 'Generando tarjetas sobre "' + topic + '"...');
+  try {
+    const prompt = `Eres un experto creando tarjetas de estudio.
+Genera ${n} tarjetas de opción múltiple sobre el tema: "${topic}" en ${lang}.
+Cada tarjeta debe tener:
+- question: la pregunta
+- correct: la respuesta correcta
+- wrong: array de 3 opciones incorrectas pero plausibles
+- explanation: breve explicación de por qué la respuesta es correcta
+
+Responde SOLO con un array JSON válido, sin ningún texto adicional ni backticks markdown. Ejemplo:
+[{"question":"...","correct":"...","wrong":["...","...","..."],"explanation":"..."}]`;
+    const raw = await callClaude(prompt);
+    return parseCards(raw);
+  } catch(e) {
+    toast('Error al conectar con la IA. Revisa tu conexión.', 'error');
+    return null;
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function generateCardsFromText(text, n) {
+  setLoading(true, 'Analizando tu material de estudio...');
+  try {
+    const snippet = text.slice(0, 3000);
+    const prompt = `Eres un experto creando tarjetas de estudio.
+Basándote ÚNICAMENTE en el siguiente texto del estudiante, genera ${n} tarjetas de opción múltiple.
+Las respuestas deben ser fieles al contenido del texto.
+
+TEXTO:
+${snippet}
+
+Cada tarjeta debe tener:
+- question: la pregunta basada en el texto
+- correct: la respuesta correcta según el texto
+- wrong: array de 3 opciones incorrectas pero plausibles
+- explanation: breve explicación
+
+Responde SOLO con un array JSON válido, sin ningún texto adicional ni backticks markdown.`;
+    const raw = await callClaude(prompt);
+    return parseCards(raw);
+  } catch(e) {
+    toast('Error al procesar el texto con IA.', 'error');
+    return null;
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  DECK DETAIL
+// ══════════════════════════════════════════════
+function openDeckDetail(id) {
+  currentDeckId = id;
+  const deck = getDeck(id);
+  document.getElementById('detail-title').textContent = deck.name;
+
+  const s = deck.stats || {};
+  document.getElementById('detail-stats').innerHTML = `
+    <span style="font-size:.82rem; color:var(--text-dim)">🃏 ${deck.cards.length} tarjetas</span>
+    <span style="font-size:.82rem; color:var(--correct)">✅ ${s.correct || 0} correctas</span>
+    <span style="font-size:.82rem; color:var(--wrong)">❌ ${s.wrong || 0} incorrectas</span>
+    <span style="font-size:.82rem; color:var(--text-dim)">📖 ${s.sessions || 0} sesiones</span>`;
+
+  const container = document.getElementById('detail-cards');
+  if (deck.cards.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-dim); font-size:.88rem;">Sin tarjetas aún. Agrega una.</p>';
+  } else {
+    container.innerHTML = deck.cards.map((c, i) => `
+      <div style="background:var(--surface2); border-radius:10px; padding:14px; border:1px solid var(--border);">
+        <div style="font-size:.82rem; color:var(--accent); font-family:var(--mono); margin-bottom:6px;">Tarjeta ${i+1}</div>
+        <div style="font-size:.9rem; font-weight:500; margin-bottom:6px;">${c.question}</div>
+        <div style="font-size:.8rem; color:var(--correct);">✓ ${c.correct}</div>
+      </div>`).join('');
+  }
+
+  openModal('modal-deck-detail');
+}
+
+function deleteDeck() {
+  if (!confirm('¿Eliminar este mazo?')) return;
+  decks = decks.filter(d => d.id !== currentDeckId);
+  save();
+  closeModal('modal-deck-detail');
+  renderDecks();
+  toast('Mazo eliminado');
+}
+
+// ══════════════════════════════════════════════
+//  ADD CARD MANUALLY
+// ══════════════════════════════════════════════
+function openAddCard() {
+  closeModal('modal-deck-detail');
+  ['card-q','card-a','card-w1','card-w2','card-w3','card-exp'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  openModal('modal-add-card');
+}
+
+function saveCard() {
+  const q = document.getElementById('card-q').value.trim();
+  const a = document.getElementById('card-a').value.trim();
+  const w1 = document.getElementById('card-w1').value.trim();
+  const w2 = document.getElementById('card-w2').value.trim();
+  const w3 = document.getElementById('card-w3').value.trim();
+  const exp = document.getElementById('card-exp').value.trim();
+  if (!q || !a) { toast('La pregunta y respuesta son obligatorias', 'error'); return; }
+  const deck = getDeck(currentDeckId);
+  deck.cards.push({ question: q, correct: a, wrong: [w1,w2,w3].filter(Boolean), explanation: exp });
+  save();
+  closeModal('modal-add-card');
+  openDeckDetail(currentDeckId);
+  toast('Tarjeta agregada ✅', 'success');
+}
+
+// ══════════════════════════════════════════════
+//  STUDY SESSION
+// ══════════════════════════════════════════════
+function startStudy() {
+  const deck = getDeck(currentDeckId);
+  if (deck.cards.length === 0) { toast('Agrega tarjetas primero', 'error'); return; }
+  closeModal('modal-deck-detail');
+
+  // Shuffle
+  studyCards = [...deck.cards].sort(() => Math.random() - .5);
+  studyIndex = 0;
+  studyCorrect = 0;
+  studyWrong = 0;
+
+  document.getElementById('study-deck-name').textContent = deck.name;
+  showScreen('screen-study');
+  renderCard();
+}
+
+function restartStudy() {
+  startStudy();
+}
+
+function renderCard() {
+  const card = studyCards[studyIndex];
+  answered = false;
+  document.getElementById('study-subtitle').textContent = 'Sesión de estudio';
+  document.getElementById('study-counter').textContent = `${studyIndex + 1} / ${studyCards.length}`;
+  document.getElementById('study-progress').style.width = ((studyIndex / studyCards.length) * 100) + '%';
+  document.getElementById('card-question').textContent = card.question;
+  document.getElementById('feedback-box').className = 'feedback-box';
+  document.getElementById('btn-next').style.display = 'none';
+
+  // Shuffle options
+  const opts = [card.correct, ...(card.wrong || [])].sort(() => Math.random() - .5);
+  const letters = ['A','B','C','D'];
+  const grid = document.getElementById('options-grid');
+  grid.innerHTML = opts.map((o, i) => `
+    <button class="option-btn" onclick="selectOption(this, '${escapeQ(o)}', '${escapeQ(card.correct)}', '${escapeQ(card.explanation || '')}')">
+      <span class="option-letter">${letters[i]}</span>
+      ${o}
+    </button>`).join('');
+}
+
+function escapeQ(s) {
+  return (s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+function selectOption(btn, selected, correct, explanation) {
+  if (answered) return;
+  answered = true;
+
+  const isCorrect = selected === correct;
+  if (isCorrect) { studyCorrect++; btn.classList.add('correct'); }
+  else {
+    studyWrong++;
+    btn.classList.add('wrong');
+    // Mark correct
+    document.querySelectorAll('.option-btn').forEach(b => {
+      const bText = b.innerText.slice(1).trim();
+      if (bText === correct) b.classList.add('correct');
+    });
+  }
+  document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+
+  const fb = document.getElementById('feedback-box');
+  fb.innerHTML = (isCorrect ? '✅ <strong>¡Correcto!</strong> ' : '❌ <strong>Incorrecto.</strong> La respuesta era: <strong>' + correct + '</strong>. ')
+    + (explanation ? explanation : '');
+  fb.classList.add('show');
+  document.getElementById('btn-next').style.display = 'inline-flex';
+}
+
+function nextCard() {
+  studyIndex++;
+  if (studyIndex >= studyCards.length) {
+    finishStudy();
+  } else {
+    renderCard();
+  }
+}
+
+function finishStudy() {
+  // Update stats
+  const deck = getDeck(currentDeckId);
+  if (!deck.stats) deck.stats = { studied:0, correct:0, wrong:0, sessions:0 };
+  deck.stats.studied = deck.cards.length;
+  deck.stats.correct += studyCorrect;
+  deck.stats.wrong += studyWrong;
+  deck.stats.sessions += 1;
+  save();
+
+  const total = studyCards.length;
+  const pct = Math.round((studyCorrect / total) * 100);
+  document.getElementById('results-score').textContent = pct + '%';
+  document.getElementById('results-label').textContent = pct >= 80 ? '¡Excelente trabajo! 🎉' : pct >= 50 ? 'Buen esfuerzo, sigue practicando 💪' : 'Sigue estudiando, tú puedes 📚';
+  document.getElementById('results-grid').innerHTML = `
+    <div class="result-stat"><div class="result-stat-val" style="color:var(--correct)">${studyCorrect}</div><div class="result-stat-label">Correctas</div></div>
+    <div class="result-stat"><div class="result-stat-val" style="color:var(--wrong)">${studyWrong}</div><div class="result-stat-label">Incorrectas</div></div>
+    <div class="result-stat"><div class="result-stat-val">${total}</div><div class="result-stat-label">Total</div></div>`;
+
+  showScreen('screen-results');
+}
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+renderDecks();
+</script>
+</body>
+</html>
